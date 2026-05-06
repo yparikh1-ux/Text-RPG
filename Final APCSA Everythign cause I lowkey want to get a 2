@@ -1,0 +1,148 @@
+import java.util.Scanner;
+
+public class GameRunner {
+    static Scanner input = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        // 1. INITIALIZE ITEMS
+        Item woodSword = new Item("WoodSword", "weapon", 10);
+        Item ironSword = new Item("IronSword", "weapon", 20);
+        Item healthPotion = new Item("Potion", "potion", 25);
+        Item dragonScale = new Item("DragonScale", "armor", 50);
+
+        // 2. INITIALIZE ROOMS (Name, Description, Loot Array)
+        Room dungeon = new Room("Dungeon", "A cold, damp cell where you began.", new Item[]{});
+        Room armory = new Room("The Armory", "Racks of rusted weapons line the walls.", new Item[]{ironSword});
+        Room lavaRoom = new Room("Lava Room", "The floor is molten rock. It's incredibly hot.", new Item[]{});
+        Room glacierRoom = new Room("Glacier Room", "Frozen spikes hang from the ceiling.", new Item[]{healthPotion});
+        Room alchemyLab = new Room("The Alchemy Lab", "Bubbling cauldrons and strange smells.", new Item[]{healthPotion, healthPotion});
+        Room trapRoom = new Room("Trap Room", "The floor tiles look loose. Watch your step!", new Item[]{});
+        Room portalRoom = new Room("Portal Room", "A swirling blue vortex stands in the center.", new Item[]{});
+        Room shrine = new Room("The Shrine", "A peaceful place of ancient stone.", new Item[]{healthPotion});
+        Room library = new Room("The Library", "Dusty books containing forgotten secrets.", new Item[]{});
+        Room treasureRoom = new Room("Treasure Room", "Gold coins overflow from massive chests!", new Item[]{dragonScale});
+        Room dragonShrine = new Room("Dragon Shrine", "The lair of the Great Dragon. Fire charrs the walls.", new Item[]{});
+
+        // 3. SET EXITS (Creating the map layout)
+        // Format: setExits(North, South, East, West)
+        dungeon.setExits(armory, null, null, null);
+        armory.setExits(alchemyLab, dungeon, library, null);
+        alchemyLab.setExits(lavaRoom, armory, null, glacierRoom);
+        glacierRoom.setExits(null, null, alchemyLab, trapRoom);
+        trapRoom.setExits(shrine, null, glacierRoom, null);
+        shrine.setExits(null, trapRoom, portalRoom, null);
+        portalRoom.setExits(null, null, lavaRoom, shrine);
+        lavaRoom.setExits(library, alchemyLab, null, portalRoom);
+        library.setExits(treasureRoom, lavaRoom, null, armory);
+        treasureRoom.setExits(dragonShrine, library, null, null);
+        dragonShrine.setExits(null, treasureRoom, null, null);
+
+        // 4. POPULATE ENEMIES
+        armory.setEnemy(new Enemy("Knight", 45, 12));
+        lavaRoom.setEnemy(new Enemy("Zombie", 35, 8));
+        glacierRoom.setEnemy(new Enemy("Skeleton", 40, 10));
+        alchemyLab.setEnemy(new Enemy("Witch", 50, 15));
+        trapRoom.setEnemy(new Enemy("Goblin", 25, 7));
+        portalRoom.setEnemy(new Enemy("Giant Spider", 60, 14));
+        dragonShrine.setEnemy(new Enemy("Dragon (BOSS)", 150, 25));
+
+        // 5. INITIALIZE PLAYER
+        System.out.println("Welcome to the 2026 APCSA RPG Project.");
+        System.out.print("Enter your hero's name: ");
+        Player player = new Player(input.nextLine(), 100, 10);
+        
+        // Give starting weapon
+        System.out.println("\nYou wake up with a Wood Sword.");
+        player.pickUp(woodSword);
+
+        Room currentRoom = dungeon;
+
+        // 6. MAIN GAME LOOP
+        while (player.isAlive()) {
+            System.out.println("\n========================================");
+            System.out.println("LOCATION: " + currentRoom.getName());
+            System.out.println(currentRoom.getDescription());
+            
+            // Check for Enemy
+            if (currentRoom.getEnemy() != null) {
+                battle(player, currentRoom.getEnemy());
+                if (!player.isAlive()) {
+                    System.out.println("You have fallen in battle...");
+                    break;
+                }
+                currentRoom.clearEnemy(); // Remove enemy after victory
+            }
+
+            // User Input
+            System.out.print("\nAction (move [north/south/east/west], take, inv, use [item], quit): ");
+            String command = input.nextLine().toLowerCase();
+
+            if (command.startsWith("move")) {
+                String dir = command.replace("move ", "").trim();
+                Room next = currentRoom.getExit(dir);
+                if (next != null) {
+                    currentRoom = next;
+                } else {
+                    System.out.println("You cannot go that way!");
+                }
+            } 
+            else if (command.equals("take")) {
+                Item[] loot = currentRoom.getLoot();
+                if (loot.length > 0) {
+                    for (Item i : loot) {
+                        player.pickUp(i);
+                    }
+                    currentRoom.clearLoot();
+                } else {
+                    System.out.println("The room is empty.");
+                }
+            } 
+            else if (command.startsWith("use")) {
+                String itemName = command.replace("use ", "").trim();
+                player.usePotion(itemName);
+            } 
+            else if (command.equals("inv")) {
+                player.showInventory();
+                player.showStats();
+            } 
+            else if (command.equals("quit")) {
+                break;
+            }
+        }
+
+        if (player.isAlive()) {
+            System.out.println("Congratulations! You survived the Labyrinth.");
+        } else {
+            System.out.println("GAME OVER.");
+        }
+    }
+
+    // Static battle helper method
+    public static void battle(Player p, Enemy e) {
+        System.out.println("\n!!! A " + e.getName().toUpperCase() + " ATTACKS !!!");
+        
+        while (p.isAlive() && e.isAlive()) {
+            System.out.println("\n" + p.getName() + " HP: " + p.getHealth() + " | " + e.getName() + " HP: " + e.getHealth());
+            System.out.print("Choose: (A)ttack or (H)eal with Potion? ");
+            String action = input.nextLine().toUpperCase();
+
+            if (action.equals("A")) {
+                int damageDealt = p.getAttackPower() + (int)(Math.random() * 5);
+                e.takeDamage(damageDealt);
+                System.out.println("You strike the " + e.getName() + " for " + damageDealt + " damage!");
+            } else if (action.equals("H")) {
+                p.usePotion("Potion");
+            }
+
+            if (e.isAlive()) {
+                int damageTaken = e.getAttackPower();
+                p.takeDamage(damageTaken);
+                System.out.println("The " + e.getName() + " hits you for " + damageTaken + " damage!");
+            }
+        }
+
+        if (p.isAlive()) {
+            System.out.println("Victory! The " + e.getName() + " has been defeated.");
+        }
+    }
+}
